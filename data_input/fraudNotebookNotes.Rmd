@@ -1,0 +1,212 @@
+Title : Finhacks 2018
+
+Class : Fraud Detection
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr) 
+library(caret)
+library(rpart.plot)
+library(ROCR)
+```
+
+
+```{r}
+dataTrain <- read.csv("fraud_train.csv")
+summary(dataTrain)
+```
+
+```{r}
+head(dataTrain)
+```
+
+```{r}
+dataTrain$flag_transaksi_finansial <- NULL
+dataTrain$status_transaksi <- NULL
+dataTrain$bank_pemilik_kartu <- NULL
+summary(dataTrain)
+```
+
+```{r}
+#dataTrain <- na.omit(dataTrain$rata_rata_nilai_transaksi)
+dataTrain <- dataTrain[complete.cases(dataTrain),]
+summary(dataTrain)
+```
+
+```{r}
+#set.seed(200)
+#ctrl <- trainControl(method="repeatedcv", number=1, repeats=1)
+#ab_forest <- train(flag_transaksi_fraud ~ ., data=dataTrain, method="rf", trControl = ctrl, importance=T)
+
+#predict without the true target variable
+#test$pred <- predict(ab_forest, test[,-25])
+#groups <- factor( dataTrain[,25] )
+#train  <- dataTrain[,-25]
+#library( kernlab )
+#ksvm.model <- ksvm( train, groups )
+#remove unnecessary column
+#dataTrain <- train[,-c(1,2,7,8,9,10,11,12,15)]
+#library(caret)
+'%ni%' <- Negate('%in%')  # define 'not in' func
+#options(scipen=999)  # prevents printing scientific notations.
+
+#Down sample
+set.seed(10)
+down_train <- downSample(x = dataTrain[, colnames(dataTrain) %ni% "flag_transaksi_fraud"],
+                         y = dataTrain$flag_transaksi_fraud)
+
+table(down_train$flag_transaksi_fraud)
+
+#Up sample
+set.seed(10)
+up_train <- upSample(x = dataTrain[, colnames(dataTrain) %ni% "flag_transaksi_fraud"],
+                     y = dataTrain$flag_transaksi_fraud)
+
+table(up_train$flag_transaksi_fraud)
+
+# Build Logistic Model
+logitmod <- glm(dataTrain$flag_transaksi_fraud ~ dataTrain$X + dataTrain$id_tanggal_transaksi_awal + dataTrain$tanggal_transaksi_awal + dataTrain$tipe_kartu + dataTrain$id_merchant + dataTrain$nama_merchant + dataTrain$tipe_mesin + dataTrain$tipe_transaksi + dataTrain$nama_transaksi + dataTrain$nilai_transaksi + dataTrain$id_negara + dataTrain$nama_negara + dataTrain$nama_kota + dataTrain$lokasi_mesin + dataTrain$pemilik_mesin + dataTrain$waktu_transaksi + dataTrain$kuartal_transaksi + dataTrain$kepemilikan_kartu + dataTrain$nama_channel + dataTrain$id_channel + dataTrain$rata_rata_nilai_transaksi + dataTrain$maksimum_nilai_transaksi + dataTrain$minimum_nilai_transaksi + dataTrain$rata_rata_jumlah_transaksi , family = "binomial", data=down_train)
+
+summary(logitmod)
+
+pred <- predict(logitmod, newdata = dataTrain, type = "response")
+
+# Recode factors
+y_pred_num <- ifelse(pred > 0.5, 1, 0)
+y_pred <- factor(y_pred_num, levels=c(0, 1))
+y_act <- dataTrain$flag_transaksi_fraud
+```
+
+```{r}
+#view (pred)
+varImp(logitmod)
+```
+
+```{r}
+# Classification Tree with rpart
+library(rpart)
+
+fit <- rpart(flag_transaksi_fraud ~ ., data = dataTrain, method = "class")
+printcp(fit) # display the results 
+plotcp(fit) # visualize cross-validation results 
+summary(fit) # detailed summary of splits
+
+# plot tree 
+plot(fit, uniform=TRUE, 
+   main="Classification Tree for Fraud Detection")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
+
+# create attractive postscript plot of tree 
+post(fit, file = "tree.ps", 
+   title = "Classification Tree for Fraud Detection")
+
+# prune the tree 
+pfit<- prune(fit, cp=   fit$cptable[which.min(fit$cptable[,"xerror"]),"CP"])
+
+# plot the pruned tree 
+plot(pfit, uniform=TRUE, 
+   main="Pruned Classification Tree for Fraud Detection")
+text(pfit, use.n=TRUE, all=TRUE, cex=.8)
+post(pfit, file = "ptree.ps", 
+   title = "Pruned Classification Tree for Fraud Detection")
+```
+
+```{r}
+summary(fit)
+```
+
+```{r}
+summary(pfit)
+```
+
+
+```{r}
+# Random Forest prediction of Kyphosis data
+library(randomForest)
+rfit <- randomForest(dataTrain$flag_transaksi_fraud ~ ., data = dataTrain)
+print(rfit) # view results 
+importance(rfit) # importance of each predictor
+```
+
+```{r}
+summary(rfit)
+```
+
+```{r}
+dataTest <- read.csv("fraud_test.csv")
+summary(dataTest)
+```
+
+```{r}
+library(randomForest)
+first_seed <- 100
+accuracies <-c()
+for (i in 1:3){
+       set.seed(first_seed)
+       first_seed <- first_seed+1
+       trainIndex <- createDataPartition(y=dataTrain$flag_transaksi_fraud, p=0.75, list=FALSE)
+       trainingSet<- dataTrain[trainIndex,]
+       testingSet<- dataTrain[-trainIndex,]
+       modelFit <- randomForest(flag_transaksi_fraud ~., data = trainingSet)
+       prediction <- predict(modelFit, testingSet)
+       testingSet$rightPred <- prediction == testingSet$classe
+       t<-table(prediction, testingSet$classe)
+       print(t)
+       accuracy <- sum(testingSet$rightPred)/nrow(testingSet)
+       accuracies <- c(accuracies,accuracy)
+       print(accuracy)
+}
+```
+
+
+
+
+
+
+
+#```{r}
+dataTrain$X <- factor(as.character(dataTrain$X))
+dataTrain$id_tanggal_transaksi_awal <- factor(as.character(dataTrain$id_tanggal_transaksi_awal))
+dataTrain$tanggal_transaksi_awal <- factor(as.character(dataTrain$tanggal_transaksi_awal))
+dataTrain$tipe_kartu <- factor(as.character(dataTrain$tipe_kartu))
+dataTrain$id_merchant <- factor(as.character(dataTrain$id_merchant))
+dataTrain$nama_merchant <- factor(as.character(dataTrain$nama_merchant))
+dataTrain$tipe_mesin <- factor(as.character(dataTrain$tipe_mesin))
+dataTrain$tipe_transaksi <- factor(as.character(dataTrain$tipe_transaksi))
+dataTrain$nama_transaksi <- factor(as.character(dataTrain$nama_transaksi))
+dataTrain$id_negara <- factor(as.character(dataTrain$id_negara))
+dataTrain$nama_negara <- factor(as.character(dataTrain$nama_negara))
+dataTrain$nama_kota <- factor(as.character(dataTrain$nama_kota))
+dataTrain$lokasi_mesin <- factor(as.character(dataTrain$lokasi_mesin))
+dataTrain$pemilik_mesin <- factor(as.character(dataTrain$pemilik_mesin))
+dataTrain$waktu_transaksi <- factor(as.character(dataTrain$waktu_transaksi))
+dataTrain$kuartal_transaksi <- factor(as.character(dataTrain$kuartal_transaksi))
+dataTrain$kepemilikan_kartu <- factor(as.character(dataTrain$kepemilikan_kartu))
+dataTrain$nama_channel <- factor(as.character(dataTrain$nama_channel))
+dataTrain$id_channel <- factor(as.character(dataTrain$id_channel))
+dataTrain$status_transaksi <- factor(as.character(dataTrain$status_transaksi))
+dataTrain$bank_pemilik_kartu <- factor(as.character(dataTrain$bank_pemilik_kartu))
+#dataTrain$flag_transaksi_fraud <- factor(as.character(dataTrain$flag_transaksi_fraud))
+summary (dataTrain)
+```
+
+
+
+
+
+```{r}
+#dataTrain$<-factor(absent$Month.of.absence, levels=1:12, labels=month.abb) 
+```
+
+
+```{r}
+#memory.limit()
+```
+
+```{r}
+#memory.limit (size = 56000)
+```
+
+
+

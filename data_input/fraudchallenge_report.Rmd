@@ -1,0 +1,123 @@
+---
+title: "Finhacks 2018"
+author: "Auto-A"
+date: "12 Oktober 2018"
+output:
+  word_document:
+    default
+  pdf_document:
+    default
+  html_document:
+    css: style.css
+    highlight: tango
+    number_sections: yes
+    theme: flatly
+---
+
+Laporan berikut menjelaskan tentang metodologi dan proses penentuan apakah transaksi yang ditandai terbukti melakukan penipuan atau tidak berdasarkan indikator yang di dapatkan dari dataset.
+
+Kata kunci: finansial, penipuan, fraud detection, finhacks  
+
+
+#Ringkasan Eksekutif
+
+Laporan berikut menjelaskan tentang metodologi dan proses penentuan apakah transaksi yang ditandai terbukti melakukan penipuan atau tidak berdasarkan indikator yang di dapatkan dari dataset. Dataset disediakan oleh panitia Finhacks 2018.
+
+Penulis mulai mengeksplorasi data dan menganalisa hubungan antar variabel hingga menghasilkan prediksi transaksi yang terbukti melakukan penipuan dengan metode Random Forest Model. Metode random forest sendiri dipilih karena bisa melakukan regresi dan klasifikasi sekaligus.
+
+flag_transaksi_finansial, status_transaksi, bank_pemilik_kartu dihapus karena dinilai tidak memiliki pengaruh statistic yang signifikan, sehingga bisa dibilang tidak akan banyak memengaruhi keluaran yang diinginkan.
+
+#Dataset
+
+Dalam dataset terdapat 28 variabel, dimana variabel terakhir yaitu flag_transaksi_fraud menjadi target yang akan dicari. flag_transaksi_fraud sendiri diubah menjadi nilai kategorikal karena isinya mendeskripsikan apakah suatu transaksi yang ditandai merupakan penipuan atau tidak.
+
+#Proses
+
+Pada lomba ini, kami akan menggunakan metode Random Forest. Random forest adalah sebuah metode machine learning yang mampu melakukan regresi dan klasifikasi sekaligus. Random Forest mampu menemukan relasi yang lebih kompleks dengan waktu yang relatif efisien. 
+
+Langkah pertama adalah mendeklarasikan semua library yang diperlukan
+
+```{r}
+library(randomForest)
+library(ggplot2)
+```
+
+
+Setelah itu, file "fraud_train.csv" dan "fraud_test.csv" dibaca dengan perintah 'read.csv'. Perintah 'summary' digunakan untuk menunjukkan ringkasan dari dataTrain dan dataTest.
+
+```{r}
+dataTrain <- read.csv('fraud_train.csv')
+summary(dataTrain)
+```
+
+
+Data-data yang tidak diperlukan dihapus karena hanya memiliki satu nilai. Data-data yang dihapus adalah "flag_transaksi_finansial", "status_transaksi", dan "bank_pemilik_kartu"
+
+```{r}
+dataTrain$flag_transaksi_finansial <- NULL
+dataTrain$status_transaksi <- NULL
+dataTrain$bank_pemilik_kartu <- NULL
+summary(dataTrain)
+```
+
+
+Perintah berikut bertujuan untuk menghitung berapa jumlah NA dalam tiap kolom pada objek "dataTrain"
+
+```{r}
+colSums(is.na(dataTrain))
+```
+
+
+Untuk menghilangkan nilai NA yang ada pada dataset tersebut, digunakan perintah sebagai berikut :
+
+```{r}
+dataTrain <- dataTrain[complete.cases(dataTrain),]
+```
+
+
+Dalam "dataTrain", semua variabel direpresentasikan dalam bentuk angka atau integer sehingga sistem menganggap semuanya numerical. Namun pada kenyataannya, terdapat beberapa variabel yang merupakan kategorikal, yaitu "flag_transaksi_fraud". 
+
+```{r}
+dataTrain$flag_transaksi_fraud <- factor(as.character(dataTrain$flag_transaksi_fraud))
+```
+
+
+
+Menggunakan cara yang sama dengan "dataTrain",  proses pengolahan data diulang kembali untuk mengolah "dataTest"
+
+```{r}
+dataTest <- read.csv('fraud_test.csv')
+summary(dataTest)
+```
+
+```{r}
+dataTest$flag_transaksi_finansial <- NULL
+dataTest$status_transaksi <- NULL
+dataTest$bank_pemilik_kartu <- NULL
+summary(dataTest)
+```
+
+```{r}
+dataTest <- dataTest[complete.cases(dataTest),]
+```
+
+
+Dengan menggunakan Random Forest, "dataTest" diolah sehingga menghasilkan 'flag_transaksi_fraud' yang diinginkan beserta probabiltas (certainty score).
+
+```{r}
+set.seed(100)
+modelFit <- randomForest(flag_transaksi_fraud ~., data = dataTrain)
+prediction <- predict(modelFit, dataTest)
+dataTest$prediction <- prediction
+probability <- predict(modelFit, dataTest, type = "prob")
+dataTest$probability <- ifelse(dataTest$prediction == 1, probability[,-1], probability[,-2])
+```
+
+
+Perintah berikut berfungsi mengubah objek ke dalam bentuk '.csv'
+
+```{r}
+fraud <- dataTest[,-c(2:24)]
+write.csv(fraud, 'fraud_challenge.csv', row.names = FALSE)
+```
+
